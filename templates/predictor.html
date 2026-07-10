@@ -1,155 +1,117 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="page">
-  <h1 class="page-title">Advanced College Predictor</h1>
-  <p class="page-sub">Powered by <a>Smart Score</a> · <a>Safety Zones</a> · <a>Volatility Index</a> · <a>Probability Engine</a></p>
+<div class="dark-app">
+  <aside class="side">
+    <h2>Your Details</h2>
 
-  <div class="quota-bar">
-    <span class="quota-label">QUOTA</span>
-    <div class="pill-group">
-      <button class="pill active" data-scope="state" onclick="setScope('state', this)">🏛 Maharashtra State</button>
-      <button class="pill" data-scope="all_india" onclick="setScope('all_india', this)">IN All India Merit</button>
+    <label class="s-label">Search By</label>
+    <div class="radio-row">
+      <label><input type="radio" name="mode" value="percentile" checked onchange="modeChanged()"> Percentile</label>
+      <label><input type="radio" name="mode" value="rank" onchange="modeChanged()"> Rank</label>
     </div>
-    <span class="quota-hint">Home · Other · State seats · category-based</span>
-  </div>
 
-  <div class="form-grid">
-    <div class="field">
-      <label>Prediction Mode</label>
-      <select id="mode" onchange="modeChanged()">
-        <option value="rank">By Rank</option>
-        <option value="percentile">By Percentile</option>
-      </select>
+    <label class="s-label" id="value-label">Your MH-CET Percentile</label>
+    <div class="num-wrap">
+      <input type="number" id="value" value="90.0000" step="0.01" min="0">
+      <button type="button" onclick="stepVal(-1)">−</button>
+      <button type="button" onclick="stepVal(1)">+</button>
     </div>
-    <div class="field">
-      <label id="value-label">Your Rank</label>
-      <input type="number" id="value" placeholder="e.g. 5000" min="0" step="any">
-    </div>
-  </div>
 
-  <div class="form-grid four">
-    <div class="field">
-      <label>Main Category <span class="q" title="Your CAP category. EWS, TFWS, Minority and flags below add extra seat pools.">?</span></label>
-      <select id="category">
-        {% for c in categories %}<option {% if c=='OPEN' %}selected{% endif %}>{{ c }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label>Gender</label>
-      <select id="gender">
-        <option>Male</option><option>Female</option><option>Any</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Seat Type <span class="q" title="State, Home University or Other-than-Home University seats.">?</span></label>
-      <select id="seat_type">
-        <option value="all">All Seats (Recommended)</option>
-        <option value="state">State Level</option>
-        <option value="home">Home University</option>
-        <option value="other">Other than Home University</option>
-      </select>
-    </div>
-    <div class="field">
-      <label>Additional Flags</label>
-      <div class="checks">
-        <label><input type="checkbox" id="flag_defence"> Defence</label>
-        <label><input type="checkbox" id="flag_pwd"> PWD</label>
+    <label class="s-label">Gender / Seat Type <span class="q2" title="Ladies seats are female-only. Female candidates can also select Gender-Neutral. 'Any' shows special codes (PWD/DEF/EWS/TFWS).">?</span></label>
+    <select id="gender">
+      <option>Gender-Neutral</option>
+      <option>Female (Ladies)</option>
+      <option>Any</option>
+    </select>
+
+    <label class="s-label">Category</label>
+    <select id="category">
+      {% for c in categories %}<option {% if c=='OPEN' %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+
+    <label class="s-label">Branch (select one or more) <span class="q2" title="Leave empty to include all branches.">?</span></label>
+    <select id="branches" multiple size="5">
+      {% for b in branches %}<option>{{ b }}</option>{% endfor %}
+    </select>
+    <span class="s-hint">Empty = All Branches. Ctrl/Cmd-click for multiple.</span>
+
+    <label class="s-label">Quota</label>
+    <select id="quota">
+      <option>All Quotas</option>
+      {% for q in quotas %}<option>{{ q }}</option>{% endfor %}
+    </select>
+
+    <label class="s-label">District (select one or more) <span class="q2" title="Leave empty to include all districts.">?</span></label>
+    <select id="districts" multiple size="5">
+      {% for d in districts %}<option>{{ d }}</option>{% endfor %}
+    </select>
+    <span class="s-hint">Empty = All Districts.</span>
+
+    <button class="btn-predict" onclick="predict()">🔍 Predict Colleges</button>
+  </aside>
+
+  <main class="main">
+    <h1 class="d-title">🎓 MH-CET College Predictor</h1>
+    <p class="d-sub">Enter your percentile and filters to see which colleges you can get.</p>
+
+    <div id="info" class="d-info">Set your details in the sidebar, then click <b>Predict Colleges</b>.</div>
+    <div id="loading" class="d-info" style="display:none">Crunching cutoffs…</div>
+    <div id="error" class="d-warn" style="display:none"></div>
+
+    <div id="results" style="display:none">
+      <div class="metric-row">
+        <div class="metric"><span>Total Options</span><b id="m-total"></b></div>
+        <div class="metric"><span>Priority Options</span><b id="m-prio"></b></div>
+        <div class="metric"><span id="m-counter-label"></span><b id="m-counter"></b></div>
+        <div class="metric"><span>Dream / Target / Safe</span><b id="m-types"></b></div>
       </div>
+      <div class="d-table-wrap">
+        <table class="d-table">
+          <thead><tr>
+            <th></th><th>Priority</th><th>Institute Code</th><th>Institute Name</th>
+            <th>District</th><th>Course Name</th><th>Category</th><th>Quota</th>
+            <th>Cutoff Percentile</th><th>Cutoff Rank</th><th>College Type</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <button class="btn-predict wide" onclick="downloadPdf()">📄 Download PDF Report</button>
     </div>
-  </div>
-
-  <div class="field">
-    <label>Additional Seat Options</label>
-    <div class="checks">
-      <label><input type="checkbox" id="opt_tfws"> TFWS</label>
-      <label><input type="checkbox" id="opt_minority"> Minority</label>
-    </div>
-  </div>
-
-  <div class="adv-card">
-    <div class="adv-head">🎯 Advanced Filters <span class="tag">All optional</span></div>
-    <div class="form-grid four">
-      <div class="field"><label>College</label>
-        <select id="colleges" multiple size="4">{% for c in colleges %}<option>{{ c }}</option>{% endfor %}</select>
-        <span class="hint">Ctrl/Cmd-click to multi-select. Empty = all.</span></div>
-      <div class="field"><label>Branch</label>
-        <select id="branches" multiple size="4">{% for b in branches %}<option>{{ b }}</option>{% endfor %}</select>
-        <span class="hint">Empty = all branches.</span></div>
-      <div class="field"><label>City</label>
-        <select id="districts" multiple size="4">{% for d in districts %}<option>{{ d }}</option>{% endfor %}</select>
-        <span class="hint">Empty = all cities.</span></div>
-      <div class="field"><label>Data Year</label>
-        <select disabled><option>{{ data_year }}</option></select></div>
-    </div>
-    <div class="zone-row">
-      <span>Filter by Safety Zone:</span>
-      <button class="chip safe on" data-zone="Safe" onclick="toggleZone(this)">🛡 Safe</button>
-      <button class="chip mod on" data-zone="Moderate" onclick="toggleZone(this)">⚡ Moderate</button>
-      <button class="chip amb on" data-zone="Ambitious" onclick="toggleZone(this)">🎯 Ambitious</button>
-      <button class="chip reach" data-zone="Reach" onclick="toggleZone(this)">🚀 Reach</button>
-    </div>
-    <div class="gap-row">
-      <span>Gap Filter:</span>
-      <select id="gap_filter">
-        <option value="met">Gap ≥ 0 (cutoff met)</option>
-        <option value="all">Show All</option>
-      </select>
-      <span class="hint">Tip: "Show All" reveals Reach colleges too</span>
-    </div>
-  </div>
-
-  <button class="btn-cta full" onclick="predict()">🔮 Predict My Colleges</button>
-
-  <div id="loading" class="loading" style="display:none">Crunching cutoffs…</div>
-  <div id="error" class="alert" style="display:none"></div>
-
-  <div id="results" style="display:none">
-    <div class="stat-row" id="stat-row"></div>
-    <div class="table-wrap">
-      <table id="rtable">
-        <thead><tr>
-          <th></th><th>Code</th><th>Institute</th><th>City</th><th>Course</th>
-          <th>Quota</th><th>Cutoff %ile</th><th>Cutoff Rank</th><th>Gap</th>
-          <th>Zone</th><th>Prob %</th><th>Smart Score</th><th>Volatility</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <button class="btn-primary" onclick="downloadPdf()">📄 Download PDF Report</button>
-  </div>
+  </main>
 </div>
 
 <script>
-let scope = 'state';
-function setScope(s, btn){ scope = s;
-  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
-  btn.classList.add('active'); }
 function modeChanged(){
-  const m = document.getElementById('mode').value;
-  document.getElementById('value-label').textContent = m==='rank' ? 'Your Rank' : 'Your Percentile';
-  document.getElementById('value').placeholder = m==='rank' ? 'e.g. 5000' : 'e.g. 92.5';
+  const m = document.querySelector('input[name=mode]:checked').value;
+  const lbl = document.getElementById('value-label');
+  const inp = document.getElementById('value');
+  if (m === 'rank'){ lbl.textContent = 'Your MH-CET Merit Rank';
+    inp.step = 100; inp.value = 10000; }
+  else { lbl.textContent = 'Your MH-CET Percentile';
+    inp.step = 0.01; inp.value = '90.0000'; }
 }
-function toggleZone(btn){ btn.classList.toggle('on'); }
+function stepVal(dir){
+  const inp = document.getElementById('value');
+  const step = parseFloat(inp.step) || 1;
+  inp.value = (parseFloat(inp.value || 0) + dir * step).toFixed(
+    inp.step === '0.01' ? 4 : 0);
+}
 function multi(id){ return [...document.getElementById(id).selectedOptions].map(o=>o.value); }
 function payload(){
   return {
-    quota_scope: scope,
-    mode: document.getElementById('mode').value,
+    mode: document.querySelector('input[name=mode]:checked').value,
     value: document.getElementById('value').value,
-    category: document.getElementById('category').value,
     gender: document.getElementById('gender').value,
-    seat_type: document.getElementById('seat_type').value,
-    flag_defence: document.getElementById('flag_defence').checked,
-    flag_pwd: document.getElementById('flag_pwd').checked,
-    opt_tfws: document.getElementById('opt_tfws').checked,
-    opt_minority: document.getElementById('opt_minority').checked,
-    colleges: multi('colleges'), branches: multi('branches'), districts: multi('districts'),
-    zones: [...document.querySelectorAll('.chip.on')].map(c=>c.dataset.zone),
-    gap_filter: document.getElementById('gap_filter').value
+    category: document.getElementById('category').value,
+    branches: multi('branches'),
+    quota: document.getElementById('quota').value,
+    districts: multi('districts')
   };
 }
+const TYPE_COLORS = {"Dream College":"#ef5350","Target College":"#ffb74d","Safe College":"#66bb6a"};
 async function predict(){
   const err = document.getElementById('error'), res = document.getElementById('results');
+  document.getElementById('info').style.display='none';
   err.style.display='none'; res.style.display='none';
   document.getElementById('loading').style.display='block';
   const r = await fetch('/api/predict', {method:'POST',
@@ -157,28 +119,32 @@ async function predict(){
   const out = await r.json();
   document.getElementById('loading').style.display='none';
   if (out.error){ err.textContent = out.error; err.style.display='block'; return; }
-  if (!out.results.length){ err.textContent = 'No colleges found for these filters. Try Show All or widen filters.'; err.style.display='block'; return; }
-  const zc = out.zone_counts || {};
-  document.getElementById('stat-row').innerHTML = `
-    <div class="stat"><b>${out.results.length}</b><span>Total Options</span></div>
-    <div class="stat"><b>${out.entered}</b><span>${out.counterpart}</span></div>
-    <div class="stat safe"><b>${zc.Safe||0}</b><span>Safe</span></div>
-    <div class="stat mod"><b>${zc.Moderate||0}</b><span>Moderate</span></div>
-    <div class="stat amb"><b>${zc.Ambitious||0}</b><span>Ambitious</span></div>
-    <div class="stat reach"><b>${zc.Reach||0}</b><span>Reach</span></div>`;
-  const tb = document.querySelector('#rtable tbody'); tb.innerHTML='';
-  for (const x of out.results){
-    const tr = document.createElement('tr');
-    if (x.priority) tr.classList.add('prio');
-    tr.innerHTML = `<td>${x.priority?'⭐':''}</td><td>${x.code}</td>
-      <td class="inst">${x.institute}</td><td>${x.district}</td><td>${x.course}</td>
-      <td class="quota">${x.quota}</td><td>${x.cutoff_pct.toFixed(4)}</td>
-      <td>${x.cutoff_rank ? x.cutoff_rank.toLocaleString() : '-'}</td>
-      <td>${x.gap.toFixed(2)}</td>
-      <td><span class="zone ${x.zone.toLowerCase()}">${x.zone}</span></td>
-      <td>${x.probability}%</td><td><b>${x.smart_score}</b></td><td>${x.volatility}</td>`;
-    tb.appendChild(tr);
+  if (!out.results.length){
+    err.textContent = 'No colleges found for these filters. Try a different category, branch, or quota.';
+    err.style.display='block'; return;
   }
+  document.getElementById('m-total').textContent = out.results.length;
+  document.getElementById('m-prio').textContent = out.priority_count;
+  document.getElementById('m-counter-label').textContent = out.counter_label;
+  document.getElementById('m-counter').textContent = out.counter_value;
+  const t = out.type_counts;
+  document.getElementById('m-types').textContent = `${t.dream} / ${t.target} / ${t.safe}`;
+  const tb = document.querySelector('.d-table tbody'); tb.innerHTML='';
+  out.results.forEach((x, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="idx">${i+1}</td>
+      <td class="star">${x.priority ? '⭐' : ''}</td>
+      <td>${x.code}</td>
+      <td class="inst">${x.institute}</td>
+      <td>${x.district}</td>
+      <td>${x.course}</td>
+      <td>${x.seat_code}</td>
+      <td class="quota">${x.quota}</td>
+      <td>${x.cutoff_pct.toFixed(4)}</td>
+      <td>${x.cutoff_rank ? x.cutoff_rank.toLocaleString() : '-'}</td>
+      <td style="color:${TYPE_COLORS[x.college_type]};font-weight:700">${x.college_type}</td>`;
+    tb.appendChild(tr);
+  });
   res.style.display='block';
 }
 async function downloadPdf(){

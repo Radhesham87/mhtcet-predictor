@@ -175,10 +175,6 @@ def load_data() -> pd.DataFrame:
     df["Cutoff Percentile"] = df[pct_cols].min(axis=1)
     df["Cutoff Rank"] = df[rank_cols].max(axis=1)
 
-    # Volatility: spread between the first and the lowest round percentile
-    first = df[pct_cols[0]] if pct_cols else pd.NA
-    df["Volatility Value"] = (first - df["Cutoff Percentile"]).abs()
-
     df = df.dropna(subset=["Cutoff Percentile"])
     _DATA_CACHE.update({"path": path, "mtime": mtime, "df": df})
     return df
@@ -202,141 +198,71 @@ def estimate_percentile_from_rank(df, r):
     return float(nearest["Cutoff Percentile"].median())
 
 
-def zone_for_gap(gap, safe_th, amb_th):
-    if gap >= safe_th:
-        return "Safe"
-    if gap >= 0:
-        return "Moderate"
-    if gap >= amb_th:
-        return "Ambitious"
-    return "Reach"
-
-
-def admission_probability(gap):
-    """Logistic curve on the percentile gap, clamped to 2-98%."""
-    p = 100 / (1 + math.exp(-1.8 * gap))
-    return round(min(max(p, 2), 98), 1)
-
-
-def volatility_label(v):
-    if pd.isna(v):
-        return "N/A"
-    if v < 0.3:
-        return "Low"
-    if v < 1.0:
-        return "Medium"
-    return "High"
+def classify_college(cutoff, percentile):
+    if cutoff > percentile:
+        return "Dream College"
+    if cutoff >= percentile - 1:
+        return "Target College"
+    return "Safe College"
 
 
 def run_prediction(form):
     df = load_data()
-    settings_band = float(get_setting("pct_band"))
+    band = float(get_setting("pct_band"))
     priority_codes = [int(c) for c in get_setting("priority_codes")]
-    safe_th = float(get_setting("zone_safe"))
-    amb_th = float(get_setting("zone_ambitious"))
 
-    mode = form.get("mode", "rank")
+    mode = form.get("mode", "percentile")
     if mode == "rank":
         rank_in = int(form.get("value") or 0)
         if rank_in <= 0:
             return {"error": "Enter a valid rank."}
         percentile = estimate_percentile_from_rank(df, rank_in)
         entered = f"Rank {rank_in:,}"
-        counterpart = f"~{percentile:.2f} percentile"
+        counter_label = "Your Approx. Percentile"
+        counter_value = f"~{percentile:.2f}"
     else:
         percentile = float(form.get("value") or -1)
         if not 0 <= percentile <= 100:
             return {"error": "Enter a valid percentile (0-100)."}
         est = estimate_merit_rank(df, percentile)
         entered = f"Percentile {percentile}"
-        counterpart = f"~{est:,} merit rank" if est else "N/A"
+        counter_label = "Your Approx. Merit Rank"
+        counter_value = f"~{est:,}" if est else "N/A"
 
-    d = df
+    d = df[df["Base Category"] == form.get("category", "OPEN")]
 
-    # Quota toggle
-    if form.get("quota_scope") == "all_india":
-        return {"error": "All India Merit data is not present in the "
-                         "current dataset. It contains Maharashtra State "
-                         "CAP rounds only.", "results": []}
+    gender = form.get("gender", "Gender-Neutral")
+    if gender != "Any":
+        if gender == "Female (Ladies)":
+            d = d[d["Gender"].isin(
+                ["Female (Ladies)", "Gender-Neutral", "Any"])]
+        else:
+            d = d[d["Gender"].isin([gender, "Any"])]
 
-    # Category + additional flag codes (flags ADD extra seat pools)
-    category = form.get("category", "OPEN")
-    mask = d["Base Category"] == category
-    if form.get("flag_defence"):
-        mask |= d["Category"].str.startswith("DEF")
-    if form.get("flag_pwd"):
-        mask |= d["Category"].str.startswith("PWD")
-    if form.get("opt_tfws"):
-        mask |= d["Base Category"] == "TFWS"
-    if form.get("opt_minority"):
-        mask |= d["Base Category"] == "MI"
-    d = d[mask]
-
-    # Gender
-    gender = form.get("gender", "Any")
-    if gender == "Male":
-        d = d[d["Gender"].isin(["Gender-Neutral", "Any"])]
-    elif gender == "Female":
-        d = d[d["Gender"].isin(["Female (Ladies)", "Gender-Neutral", "Any"])]
-
-    # Seat type (Level column)
-    seat = form.get("seat_type", "all")
-    if seat == "state":
-        d = d[d["Level"].str.contains("State", na=False)]
-    elif seat == "home":
-        d = d[d["Level"].str.startswith("Home University Seats Allotted to Home",
-                                        na=False)]
-    elif seat == "other":
-        d = d[d["Level"].str.startswith("Other Than Home", na=False)]
-
-    # Advanced filters
-    colleges = form.get("colleges") or []
     branches = form.get("branches") or []
     districts = form.get("districts") or []
-    if colleges:
-        d = d[d["Institute Name"].isin(colleges)]
+    quota = form.get("quota", "All Quotas")
     if branches:
         d = d[d["Course Name"].isin(branches)]
+    if quota != "All Quotas":
+        d = d[d["Level"] == quota]
     if districts:
         d = d[d["District"].isin(districts)]
 
-    # Band + priority pinning
-    lo, hi = percentile - settings_band, percentile + settings_band
+    lo, hi = percentile - band, percentile + band
     in_band = d[d["Cutoff Percentile"].between(lo, hi)]
     prio = d[d["Institute Code"].isin(priority_codes)]
     combined = pd.concat([prio, in_band]).drop_duplicates().copy()
 
     if combined.empty:
-        return {"entered": entered, "counterpart": counterpart,
-                "results": []}
-
-    combined["gap"] = percentile - combined["Cutoff Percentile"]
-    combined["zone"] = combined["gap"].map(
-        lambda gp: zone_for_gap(gp, safe_th, amb_th))
-
-    # Gap filter + safety-zone chip filter
-    if form.get("gap_filter", "met") == "met":
-        keep_prio = combined["Institute Code"].isin(priority_codes)
-        combined = combined[(combined["gap"] >= 0) | keep_prio]
-    zones = form.get("zones") or []
-    if zones:
-        keep_prio = combined["Institute Code"].isin(priority_codes)
-        combined = combined[combined["zone"].isin(zones) | keep_prio]
-
-    if combined.empty:
-        return {"entered": entered, "counterpart": counterpart,
-                "results": []}
-
-    combined["probability"] = combined["gap"].map(admission_probability)
-    # Smart Score: 60% admission probability + 40% institute demand
-    pct_norm = (combined["Cutoff Percentile"] / 100).clip(0, 1)
-    combined["smart_score"] = (0.6 * combined["probability"] +
-                               0.4 * pct_norm * 100).round(1)
-    combined["volatility"] = combined["Volatility Value"].map(volatility_label)
+        return {"entered": entered, "counter_label": counter_label,
+                "counter_value": counter_value, "results": []}
 
     rank_map = {c: i for i, c in enumerate(priority_codes)}
     combined["_prio"] = combined["Institute Code"].map(
         lambda c: rank_map.get(c, len(priority_codes)))
+    combined["college_type"] = combined["Cutoff Percentile"].map(
+        lambda c: classify_college(c, percentile))
     combined = combined.sort_values(["_prio", "Cutoff Percentile"],
                                     ascending=[True, False])
 
@@ -348,23 +274,24 @@ def run_prediction(form):
             "institute": str(r["Institute Name"]),
             "district": str(r["District"]),
             "course": str(r["Course Name"]),
-            "quota": str(r["Level"]),
             "seat_code": str(r["Category"]),
+            "quota": str(r["Level"]),
             "cutoff_pct": round(float(r["Cutoff Percentile"]), 4),
             "cutoff_rank": (int(r["Cutoff Rank"])
                             if pd.notna(r["Cutoff Rank"]) else None),
-            "gap": round(float(r["gap"]), 2),
-            "zone": r["zone"],
-            "probability": float(r["probability"]),
-            "smart_score": float(r["smart_score"]),
-            "volatility": r["volatility"],
-            "yoy": "N/A",   # needs multi-year data
+            "college_type": r["college_type"],
         })
 
-    zone_counts = combined["zone"].value_counts().to_dict()
-    return {"entered": entered, "counterpart": counterpart,
+    tc = combined["college_type"].value_counts().to_dict()
+    return {"entered": entered, "counter_label": counter_label,
+            "counter_value": counter_value,
             "percentile": round(percentile, 4),
-            "zone_counts": zone_counts, "results": results}
+            "priority_count": int((combined["_prio"] <
+                                   len(priority_codes)).sum()),
+            "type_counts": {"dream": tc.get("Dream College", 0),
+                            "target": tc.get("Target College", 0),
+                            "safe": tc.get("Safe College", 0)},
+            "results": results}
 
 
 # ----------------------------------------------------------------- auth
@@ -455,10 +382,9 @@ def predictor():
     return render_template(
         "predictor.html",
         categories=sorted(df["Base Category"].unique()),
-        colleges=sorted(df["Institute Name"].dropna().unique()),
         branches=sorted(df["Course Name"].dropna().unique()),
-        districts=sorted(df["District"].dropna().unique()),
-        data_year=get_setting("data_year"))
+        quotas=sorted(df["Level"].dropna().unique()),
+        districts=sorted(df["District"].dropna().unique()))
 
 
 @app.route("/api/predict", methods=["POST"])
@@ -506,7 +432,8 @@ def build_pdf(out, payload):
     story = [
         Paragraph("MHT-CET College Predictor Report", styles["Title"]),
         Paragraph(
-            f"Entered: <b>{out['entered']}</b> ({out['counterpart']}) | "
+            f"Entered: <b>{out['entered']}</b> "
+            f"({out['counter_label']}: {out['counter_value']}) | "
             f"Category: <b>{payload.get('category')}</b> | "
             f"Gender: <b>{payload.get('gender')}</b> | "
             f"Options: <b>{len(out['results'])}</b> | "
