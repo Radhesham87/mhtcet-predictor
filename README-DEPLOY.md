@@ -5,8 +5,8 @@ Same features as local/, prepared for cloud hosting.
 
 ## Environment variables (set these on your host)
 - SECRET_KEY   - long random string (required in production)
-- ADMIN_EMAIL  - admin login email (Radheshamtaynath8@gmail.com.local)
-- ADMIN_PASSWORD - admin password (RadheMH-CET@87)
+- ADMIN_EMAIL  - admin login email (default admin@mhtcet.local)
+- ADMIN_PASSWORD - admin password (default admin123 - CHANGE THIS)
 
 ## Render.com (free tier works)
 1. Push this web/ folder to a GitHub repo.

@@ -31,6 +31,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.path.join(BASE_DIR, "predictor.db")
 DEFAULT_XLSX = os.path.join(DATA_DIR, "Final MH-CET_Cutoff.xlsx")
+DEFAULT_CSV = os.path.join(DATA_DIR, "cutoff_data.csv.gz")
+# Prefer the slim compressed CSV when present - loads with far less memory
+# than xlsx (important on 512MB hosts). Admin xlsx uploads still work.
+DEFAULT_DATA = DEFAULT_CSV if os.path.exists(DEFAULT_CSV) else DEFAULT_XLSX
 
 DEFAULT_ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@mhtcet.local")
 DEFAULT_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
@@ -50,7 +54,7 @@ DEFAULT_SETTINGS = {
     "zone_safe": 1.5,     # gap >= safe  -> Safe
     "zone_ambitious": -1.0,  # gap >= this (and < 0) -> Ambitious, else Reach
     "registration_open": 1,
-    "active_data_file": DEFAULT_XLSX,
+    "active_data_file": DEFAULT_DATA,
     "data_year": "2025 (Latest)",
 }
 
@@ -146,12 +150,15 @@ def parse_code(code: str):
 def load_data() -> pd.DataFrame:
     path = get_setting("active_data_file")
     if not os.path.exists(path):
-        path = DEFAULT_XLSX
+        path = DEFAULT_DATA
     mtime = os.path.getmtime(path)
     if _DATA_CACHE["path"] == path and _DATA_CACHE["mtime"] == mtime:
         return _DATA_CACHE["df"]
 
-    df = pd.read_excel(path)
+    if path.endswith((".csv", ".csv.gz")):
+        df = pd.read_csv(path)
+    else:
+        df = pd.read_excel(path)
     df.columns = [c.strip() for c in df.columns]
     if "Round 1Percentile" not in df.columns and \
             "Round 1 Percentile" in df.columns:
@@ -632,7 +639,7 @@ def admin_user(uid, action):
 if __name__ == "__main__":
     os.makedirs(DATA_DIR, exist_ok=True)
     init_db()
-    if not os.path.exists(DEFAULT_XLSX):
-        print(f"WARNING: cutoff file not found at {DEFAULT_XLSX}")
+    if not os.path.exists(DEFAULT_DATA):
+        print(f"WARNING: cutoff data not found at {DEFAULT_DATA}")
     print("Starting MHT-CET College Predictor at http://127.0.0.1:5000")
     app.run(host="127.0.0.1", port=5000, debug=False)
