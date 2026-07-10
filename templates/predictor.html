@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page">
+  <h1 class="page-title">Advanced College Predictor</h1>
+  <p class="page-sub">Powered by <a>Smart Score</a> · <a>Safety Zones</a> · <a>Volatility Index</a> · <a>Probability Engine</a></p>
+
+  <div class="quota-bar">
+    <span class="quota-label">QUOTA</span>
+    <div class="pill-group">
+      <button class="pill active" data-scope="state" onclick="setScope('state', this)">🏛 Maharashtra State</button>
+      <button class="pill" data-scope="all_india" onclick="setScope('all_india', this)">IN All India Merit</button>
+    </div>
+    <span class="quota-hint">Home · Other · State seats · category-based</span>
+  </div>
+
+  <div class="form-grid">
+    <div class="field">
+      <label>Prediction Mode</label>
+      <select id="mode" onchange="modeChanged()">
+        <option value="rank">By Rank</option>
+        <option value="percentile">By Percentile</option>
+      </select>
+    </div>
+    <div class="field">
+      <label id="value-label">Your Rank</label>
+      <input type="number" id="value" placeholder="e.g. 5000" min="0" step="any">
+    </div>
+  </div>
+
+  <div class="form-grid four">
+    <div class="field">
+      <label>Main Category <span class="q" title="Your CAP category. EWS, TFWS, Minority and flags below add extra seat pools.">?</span></label>
+      <select id="category">
+        {% for c in categories %}<option {% if c=='OPEN' %}selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Gender</label>
+      <select id="gender">
+        <option>Male</option><option>Female</option><option>Any</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Seat Type <span class="q" title="State, Home University or Other-than-Home University seats.">?</span></label>
+      <select id="seat_type">
+        <option value="all">All Seats (Recommended)</option>
+        <option value="state">State Level</option>
+        <option value="home">Home University</option>
+        <option value="other">Other than Home University</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Additional Flags</label>
+      <div class="checks">
+        <label><input type="checkbox" id="flag_defence"> Defence</label>
+        <label><input type="checkbox" id="flag_pwd"> PWD</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Additional Seat Options</label>
+    <div class="checks">
+      <label><input type="checkbox" id="opt_tfws"> TFWS</label>
+      <label><input type="checkbox" id="opt_minority"> Minority</label>
+    </div>
+  </div>
+
+  <div class="adv-card">
+    <div class="adv-head">🎯 Advanced Filters <span class="tag">All optional</span></div>
+    <div class="form-grid four">
+      <div class="field"><label>College</label>
+        <select id="colleges" multiple size="4">{% for c in colleges %}<option>{{ c }}</option>{% endfor %}</select>
+        <span class="hint">Ctrl/Cmd-click to multi-select. Empty = all.</span></div>
+      <div class="field"><label>Branch</label>
+        <select id="branches" multiple size="4">{% for b in branches %}<option>{{ b }}</option>{% endfor %}</select>
+        <span class="hint">Empty = all branches.</span></div>
+      <div class="field"><label>City</label>
+        <select id="districts" multiple size="4">{% for d in districts %}<option>{{ d }}</option>{% endfor %}</select>
+        <span class="hint">Empty = all cities.</span></div>
+      <div class="field"><label>Data Year</label>
+        <select disabled><option>{{ data_year }}</option></select></div>
+    </div>
+    <div class="zone-row">
+      <span>Filter by Safety Zone:</span>
+      <button class="chip safe on" data-zone="Safe" onclick="toggleZone(this)">🛡 Safe</button>
+      <button class="chip mod on" data-zone="Moderate" onclick="toggleZone(this)">⚡ Moderate</button>
+      <button class="chip amb on" data-zone="Ambitious" onclick="toggleZone(this)">🎯 Ambitious</button>
+      <button class="chip reach" data-zone="Reach" onclick="toggleZone(this)">🚀 Reach</button>
+    </div>
+    <div class="gap-row">
+      <span>Gap Filter:</span>
+      <select id="gap_filter">
+        <option value="met">Gap ≥ 0 (cutoff met)</option>
+        <option value="all">Show All</option>
+      </select>
+      <span class="hint">Tip: "Show All" reveals Reach colleges too</span>
+    </div>
+  </div>
+
+  <button class="btn-cta full" onclick="predict()">🔮 Predict My Colleges</button>
+
+  <div id="loading" class="loading" style="display:none">Crunching cutoffs…</div>
+  <div id="error" class="alert" style="display:none"></div>
+
+  <div id="results" style="display:none">
+    <div class="stat-row" id="stat-row"></div>
+    <div class="table-wrap">
+      <table id="rtable">
+        <thead><tr>
+          <th></th><th>Code</th><th>Institute</th><th>City</th><th>Course</th>
+          <th>Quota</th><th>Cutoff %ile</th><th>Cutoff Rank</th><th>Gap</th>
+          <th>Zone</th><th>Prob %</th><th>Smart Score</th><th>Volatility</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="btn-primary" onclick="downloadPdf()">📄 Download PDF Report</button>
+  </div>
+</div>
+
+<script>
+let scope = 'state';
+function setScope(s, btn){ scope = s;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active'); }
+function modeChanged(){
+  const m = document.getElementById('mode').value;
+  document.getElementById('value-label').textContent = m==='rank' ? 'Your Rank' : 'Your Percentile';
+  document.getElementById('value').placeholder = m==='rank' ? 'e.g. 5000' : 'e.g. 92.5';
+}
+function toggleZone(btn){ btn.classList.toggle('on'); }
+function multi(id){ return [...document.getElementById(id).selectedOptions].map(o=>o.value); }
+function payload(){
+  return {
+    quota_scope: scope,
+    mode: document.getElementById('mode').value,
+    value: document.getElementById('value').value,
+    category: document.getElementById('category').value,
+    gender: document.getElementById('gender').value,
+    seat_type: document.getElementById('seat_type').value,
+    flag_defence: document.getElementById('flag_defence').checked,
+    flag_pwd: document.getElementById('flag_pwd').checked,
+    opt_tfws: document.getElementById('opt_tfws').checked,
+    opt_minority: document.getElementById('opt_minority').checked,
+    colleges: multi('colleges'), branches: multi('branches'), districts: multi('districts'),
+    zones: [...document.querySelectorAll('.chip.on')].map(c=>c.dataset.zone),
+    gap_filter: document.getElementById('gap_filter').value
+  };
+}
+async function predict(){
+  const err = document.getElementById('error'), res = document.getElementById('results');
+  err.style.display='none'; res.style.display='none';
+  document.getElementById('loading').style.display='block';
+  const r = await fetch('/api/predict', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload())});
+  const out = await r.json();
+  document.getElementById('loading').style.display='none';
+  if (out.error){ err.textContent = out.error; err.style.display='block'; return; }
+  if (!out.results.length){ err.textContent = 'No colleges found for these filters. Try Show All or widen filters.'; err.style.display='block'; return; }
+  const zc = out.zone_counts || {};
+  document.getElementById('stat-row').innerHTML = `
+    <div class="stat"><b>${out.results.length}</b><span>Total Options</span></div>
+    <div class="stat"><b>${out.entered}</b><span>${out.counterpart}</span></div>
+    <div class="stat safe"><b>${zc.Safe||0}</b><span>Safe</span></div>
+    <div class="stat mod"><b>${zc.Moderate||0}</b><span>Moderate</span></div>
+    <div class="stat amb"><b>${zc.Ambitious||0}</b><span>Ambitious</span></div>
+    <div class="stat reach"><b>${zc.Reach||0}</b><span>Reach</span></div>`;
+  const tb = document.querySelector('#rtable tbody'); tb.innerHTML='';
+  for (const x of out.results){
+    const tr = document.createElement('tr');
+    if (x.priority) tr.classList.add('prio');
+    tr.innerHTML = `<td>${x.priority?'⭐':''}</td><td>${x.code}</td>
+      <td class="inst">${x.institute}</td><td>${x.district}</td><td>${x.course}</td>
+      <td class="quota">${x.quota}</td><td>${x.cutoff_pct.toFixed(4)}</td>
+      <td>${x.cutoff_rank ? x.cutoff_rank.toLocaleString() : '-'}</td>
+      <td>${x.gap.toFixed(2)}</td>
+      <td><span class="zone ${x.zone.toLowerCase()}">${x.zone}</span></td>
+      <td>${x.probability}%</td><td><b>${x.smart_score}</b></td><td>${x.volatility}</td>`;
+    tb.appendChild(tr);
+  }
+  res.style.display='block';
+}
+async function downloadPdf(){
+  const r = await fetch('/api/report', {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload())});
+  if (!r.ok){ alert('Could not generate PDF.'); return; }
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'MHCET_Prediction_Report.pdf';
+  a.click();
+}
+</script>
+{% endblock %}

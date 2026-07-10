@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div class="badge">● MHT CET 2026 · AI-POWERED ADVANCED PREDICTION ENGINE</div>
+  <h1>MHT CET College Predictor 2026<br>
+    <span class="grad">Find Your Dream College</span><br>with Smart Analysis</h1>
+  <p class="hero-sub">Predict MHT CET 2026 colleges by rank or percentile. Our engine calculates
+     Smart Score, Admission Probability %, Safety Zones, Cutoff Volatility, and
+     Year-over-Year trend for the most accurate predictions.</p>
+  <a class="btn-cta" href="{{ url_for('predictor') }}">🔮 Start Prediction</a>
+  <div class="hero-stats">
+    <div><b>{{ '{:,}'.format(stats.rows) }}</b><span>Cutoff Records</span></div>
+    <div><b>{{ stats.institutes }}</b><span>Institutes</span></div>
+    <div><b>{{ stats.courses }}</b><span>Branches</span></div>
+    <div><b>{{ stats.districts }}</b><span>Districts</span></div>
+  </div>
+</section>
+<section class="cards">
+  <h2>Everything the engine gives you</h2>
+  <div class="grid">
+    <div class="card"><div class="ic">🎯</div><h3>Dual Prediction Modes</h3><p>Search by CET percentile or by state merit rank. Ranks are converted using real rank-percentile pairs from official CAP data.</p></div>
+    <div class="card"><div class="ic">🛡️</div><h3>Safety Zones</h3><p>Every option is classified Safe, Moderate, Ambitious, or Reach based on the gap between your score and the closing cutoff.</p></div>
+    <div class="card"><div class="ic">📈</div><h3>Admission Probability %</h3><p>A calibrated probability estimate for each seat, computed from your percentile gap.</p></div>
+    <div class="card"><div class="ic">⚡</div><h3>Smart Score</h3><p>A 0-100 blend of your admission probability and institute demand, so stronger colleges you can actually get rank higher.</p></div>
+    <div class="card"><div class="ic">🌊</div><h3>Cutoff Volatility</h3><p>See how much each cutoff moved between CAP rounds - low volatility means a stable, predictable cutoff.</p></div>
+    <div class="card"><div class="ic">⭐</div><h3>Priority Institutes</h3><p>COEP, VJTI, PICT, SPIT and other top institutes are always pinned at the top of your results.</p></div>
+    <div class="card"><div class="ic">🧮</div><h3>Advanced Filters</h3><p>Filter by college, branch, city, seat type, TFWS, Minority, Defence and PWD seat pools.</p></div>
+    <div class="card"><div class="ic">📄</div><h3>PDF Reports</h3><p>Download a clean, printable report of your predicted colleges with one click.</p></div>
+    <div class="card"><div class="ic">🔐</div><h3>Admin Managed Data</h3><p>Cutoff data is uploaded and versioned by administrators from official CAP Excel sheets.</p></div>
+  </div>
+</section>
+{% endblock %}

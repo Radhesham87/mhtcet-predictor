@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Sign In · MHT-CET Predictor 2026{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-hero">
+    <div class="badge">● MHT CET 2026 · AI-POWERED ADVANCED PREDICTION ENGINE</div>
+    <h1>MHT CET College Predictor 2026<br>
+      <span class="grad">Find Your Dream College</span><br>with Smart Analysis</h1>
+    <p>Predict MHT CET 2026 colleges by rank or percentile. Our engine calculates
+       Smart Score, Admission Probability %, Safety Zones, Cutoff Volatility, and
+       Year-over-Year trend for the most accurate predictions.</p>
+  </div>
+  <div class="auth-card">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('login', this)">Sign In</button>
+      <button class="tab" onclick="showTab('register', this)">Create Account</button>
+    </div>
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    <form method="post" id="form-login" class="auth-form">
+      <input type="hidden" name="action" value="login">
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="you@example.com">
+      <label>Password</label>
+      <input type="password" name="password" required placeholder="••••••••">
+      <button class="btn-primary" type="submit">Sign In</button>
+      <p class="hint">Admins sign in here with their admin email.</p>
+    </form>
+    <form method="post" id="form-register" class="auth-form" style="display:none">
+      <input type="hidden" name="action" value="register">
+      <label>Full Name</label>
+      <input type="text" name="name" required placeholder="Your name">
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="you@example.com">
+      <label>Password</label>
+      <input type="password" name="password" required minlength="6" placeholder="Min 6 characters">
+      <button class="btn-primary" type="submit">Create Account</button>
+    </form>
+  </div>
+</div>
+<script>
+function showTab(which, btn){
+  document.getElementById('form-login').style.display = which==='login'?'flex':'none';
+  document.getElementById('form-register').style.display = which==='register'?'flex':'none';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

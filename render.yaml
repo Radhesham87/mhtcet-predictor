@@ -1,0 +1,15 @@
+# Render Blueprint - auto-configures the service when you connect the repo
+services:
+  - type: web
+    name: mhtcet-predictor
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_EMAIL
+        value: admin@mhtcet.local
+      - key: ADMIN_PASSWORD
+        sync: false   # you will be asked to type this once in the dashboard

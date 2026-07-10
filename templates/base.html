@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}MHT-CET College Predictor 2026{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% if session.get('user_id') %}
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="{{ url_for('features') }}">🎓 MHT-CET <span>Predictor</span></a>
+    <div class="nav-links">
+      <a href="{{ url_for('features') }}">Features</a>
+      <a href="{{ url_for('predictor') }}">Predictor</a>
+      {% if session.get('role') == 'admin' %}<a href="{{ url_for('admin') }}">Admin</a>{% endif %}
+      <span class="nav-user">{{ session.get('name') }}</span>
+      <a class="btn-outline" href="{{ url_for('logout') }}">Logout</a>
+    </div>
+  </div>
+</nav>
+{% endif %}
+{% block content %}{% endblock %}
+<footer class="footer">MHT-CET College Predictor 2026 · Data-driven guidance · Cutoffs from official CAP rounds</footer>
+</body>
+</html>

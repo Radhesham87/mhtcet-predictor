@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page">
+  <div class="alert">Upload failed: {{ msg }}</div>
+  <a class="btn-primary" href="{{ url_for('admin') }}">Back to Admin</a>
+</div>
+{% endblock %}
