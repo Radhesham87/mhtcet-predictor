@@ -5,6 +5,7 @@
   <div class="stat-row">
     <div class="stat"><b>{{ users|length }}</b><span>Users</span></div>
     <div class="stat"><b>{{ total_predictions }}</b><span>Predictions Run</span></div>
+    <div class="stat"><b style="color:#d97706">{{ pending }}</b><span>Pending Approval</span></div>
     <div class="stat"><b>{{ '{:,}'.format(data_info.rows) }}</b><span>Cutoff Rows</span></div>
     <div class="stat"><b>{{ data_info.institutes }}</b><span>Institutes</span></div>
   </div>
@@ -42,14 +43,17 @@
   <div class="adv-card">
     <div class="adv-head">👥 Users</div>
     <table class="admin-table">
-      <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Approved</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
       {% for u in users %}
         <tr>
           <td>{{ u.id }}</td><td>{{ u.name }}</td><td>{{ u.email }}</td>
           <td>{{ u.role }}</td>
+          <td>{% if u.approved %}<span style="color:#16a34a;font-weight:700">Yes</span>{% else %}<span style="color:#d97706;font-weight:700">Pending</span>{% endif %}</td>
           <td>{{ 'Disabled' if u.disabled else 'Active' }}</td>
           <td class="actions">
+            {% if not u.approved %}<form method="post" action="{{ url_for('admin_user', uid=u.id, action='approve') }}"><button style="background:#16a34a;color:#fff;border-color:#16a34a">Approve</button></form>
+            {% elif u.role != 'admin' %}<form method="post" action="{{ url_for('admin_user', uid=u.id, action='revoke') }}"><button>Revoke</button></form>{% endif %}
             <form method="post" action="{{ url_for('admin_user', uid=u.id, action='toggle') }}"><button>{{ 'Enable' if u.disabled else 'Disable' }}</button></form>
             <form method="post" action="{{ url_for('admin_user', uid=u.id, action='reset') }}"><button>Reset PW</button></form>
             {% if u.role != 'admin' %}<form method="post" action="{{ url_for('admin_user', uid=u.id, action='promote') }}"><button>Make Admin</button></form>{% endif %}
@@ -58,7 +62,7 @@
       {% endfor %}
       </tbody>
     </table>
-    <span class="hint">Password reset sets the password to <b>changeme123</b>.</span>
+    <span class="hint">New registrations are <b>Pending</b> until you click Approve - unapproved users cannot sign in. Password reset sets the password to <b>changeme123</b>.</span>
   </div>
 
   <div class="adv-card">

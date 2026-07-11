@@ -83,6 +83,7 @@ def init_db():
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'user',
         disabled INTEGER NOT NULL DEFAULT 0,
+        approved INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS settings (
@@ -97,13 +98,22 @@ def init_db():
         results INTEGER, created_at TEXT
     );
     """)
+    # Migration: add the approved column to older databases.
+    # Existing accounts are grandfathered in as approved so nobody
+    # already using the site gets locked out.
+    cols = [r[1] for r in con.execute("PRAGMA table_info(users)")]
+    if "approved" not in cols:
+        con.execute("ALTER TABLE users ADD COLUMN approved "
+                    "INTEGER NOT NULL DEFAULT 0")
+        con.execute("UPDATE users SET approved = 1")
+
     cur = con.execute("SELECT COUNT(*) c FROM users WHERE role='admin'")
     if cur.fetchone()[0] == 0:
         con.execute(
-            "INSERT INTO users (name,email,password_hash,role,created_at) "
-            "VALUES (?,?,?,?,?)",
+            "INSERT INTO users (name,email,password_hash,role,approved,"
+            "created_at) VALUES (?,?,?,?,?,?)",
             ("Administrator", DEFAULT_ADMIN_EMAIL,
-             generate_password_hash(DEFAULT_ADMIN_PASSWORD), "admin",
+             generate_password_hash(DEFAULT_ADMIN_PASSWORD), "admin", 1,
              datetime.now().isoformat()))
         print("=" * 60)
         print("Default admin account created:")
@@ -337,12 +347,13 @@ def login():
                 try:
                     db().execute(
                         "INSERT INTO users (name,email,password_hash,role,"
-                        "created_at) VALUES (?,?,?,?,?)",
+                        "approved,created_at) VALUES (?,?,?,?,?,?)",
                         (request.form["name"].strip(), email,
-                         generate_password_hash(pw), "user",
+                         generate_password_hash(pw), "user", 0,
                          datetime.now().isoformat()))
                     db().commit()
-                    error = "Account created. Please sign in."
+                    error = ("Account created. An admin must approve your "
+                             "account before you can sign in.")
                 except sqlite3.IntegrityError:
                     error = "Email already registered."
         else:
@@ -350,11 +361,16 @@ def login():
                                (email,)).fetchone()
             if row and not row["disabled"] and \
                     check_password_hash(row["password_hash"], pw):
-                session["user_id"] = row["id"]
-                session["name"] = row["name"]
-                session["role"] = row["role"]
-                return redirect(url_for("features"))
-            error = "Invalid credentials or account disabled."
+                if not row["approved"]:
+                    error = ("Your account is waiting for admin approval. "
+                             "Please try again later.")
+                else:
+                    session["user_id"] = row["id"]
+                    session["name"] = row["name"]
+                    session["role"] = row["role"]
+                    return redirect(url_for("features"))
+            else:
+                error = "Invalid credentials or account disabled."
     return render_template("login.html", error=error)
 
 
@@ -480,8 +496,9 @@ def build_pdf(out, payload):
 def admin():
     df = load_data()
     users = db().execute(
-        "SELECT id,name,email,role,disabled,created_at FROM users "
-        "ORDER BY id").fetchall()
+        "SELECT id,name,email,role,disabled,approved,created_at FROM users "
+        "ORDER BY approved ASC, id ASC").fetchall()
+    pending = sum(1 for u in users if not u["approved"])
     logs = db().execute(
         "SELECT COUNT(*) c FROM prediction_log").fetchone()["c"]
     top_branches = db().execute(
@@ -501,7 +518,7 @@ def admin():
                 "data_year": get_setting("data_year")}
     return render_template("admin.html", users=users, data_info=data_info,
                            settings=settings, total_predictions=logs,
-                           top_branches=top_branches)
+                           top_branches=top_branches, pending=pending)
 
 
 @app.route("/admin/upload", methods=["POST"])
@@ -551,7 +568,11 @@ def admin_settings():
 def admin_user(uid, action):
     if uid == session.get("user_id"):
         return redirect(url_for("admin"))
-    if action == "toggle":
+    if action == "approve":
+        db().execute("UPDATE users SET approved=1 WHERE id=?", (uid,))
+    elif action == "revoke":
+        db().execute("UPDATE users SET approved=0 WHERE id=?", (uid,))
+    elif action == "toggle":
         db().execute("UPDATE users SET disabled = 1 - disabled WHERE id=?",
                      (uid,))
     elif action == "promote":
