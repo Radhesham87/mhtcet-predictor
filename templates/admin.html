@@ -32,6 +32,8 @@
         <input type="number" step="0.1" name="zone_ambitious" value="{{ settings.zone_ambitious }}"></label>
       <label>Data year label
         <input type="text" name="data_year" value="{{ settings.data_year }}"></label>
+      <label>Access fee (₹, shown on payment page)
+        <input type="text" name="payment_amount" value="{{ settings.payment_amount }}"></label>
       <label class="wide">Priority institute codes (comma separated, pinned in order)
         <input type="text" name="priority_codes" value="{{ settings.priority_codes }}"></label>
       <label class="checkline"><input type="checkbox" name="registration_open"
@@ -63,6 +65,22 @@
       </tbody>
     </table>
     <span class="hint">New registrations are <b>Pending</b> until you click Approve - unapproved users cannot sign in. Password reset sets the password to <b>changeme123</b>.</span>
+  </div>
+
+  <div class="adv-card">
+    <div class="adv-head">💳 Payment Submissions</div>
+    {% if payments %}
+    <table class="admin-table">
+      <thead><tr><th>#</th><th>Email</th><th>Transaction ID / UTR</th><th>Submitted</th></tr></thead>
+      <tbody>
+      {% for p in payments %}
+        <tr><td>{{ p.id }}</td><td>{{ p.email }}</td><td>{{ p.txn_ref }}</td>
+            <td>{{ p.created_at[:16].replace('T',' ') }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <span class="hint">Verify the transaction in your bank/UPI app, then click <b>Approve</b> next to that user's email in the Users table above.</span>
+    {% else %}<p>No payment submissions yet.</p>{% endif %}
   </div>
 
   <div class="adv-card">

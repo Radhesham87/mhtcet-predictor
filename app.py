@@ -56,6 +56,7 @@ DEFAULT_SETTINGS = {
     "registration_open": 1,
     "active_data_file": DEFAULT_DATA,
     "data_year": "2025 (Latest)",
+    "payment_amount": "99",
 }
 
 # ----------------------------------------------------------------- database
@@ -89,6 +90,12 @@ def init_db():
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        txn_ref TEXT NOT NULL,
+        created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS prediction_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -352,8 +359,7 @@ def login():
                          generate_password_hash(pw), "user", 0,
                          datetime.now().isoformat()))
                     db().commit()
-                    error = ("Account created. An admin must approve your "
-                             "account before you can sign in.")
+                    return redirect(url_for("payment", email=email))
                 except sqlite3.IntegrityError:
                     error = "Email already registered."
         else:
@@ -362,8 +368,9 @@ def login():
             if row and not row["disabled"] and \
                     check_password_hash(row["password_hash"], pw):
                 if not row["approved"]:
-                    error = ("Your account is waiting for admin approval. "
-                             "Please try again later.")
+                    error = ("Your account is not activated yet. Complete "
+                             "the payment and wait for admin approval. "
+                             "<a href='/payment'>Payment details</a>")
                 else:
                     session["user_id"] = row["id"]
                     session["name"] = row["name"]
@@ -372,6 +379,28 @@ def login():
             else:
                 error = "Invalid credentials or account disabled."
     return render_template("login.html", error=error)
+
+
+@app.route("/payment", methods=["GET", "POST"])
+def payment():
+    msg = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        txn = request.form.get("txn_ref", "").strip()
+        if email and txn:
+            db().execute(
+                "INSERT INTO payments (email,txn_ref,created_at) "
+                "VALUES (?,?,?)",
+                (email, txn, datetime.now().isoformat()))
+            db().commit()
+            msg = ("Payment reference submitted. The admin will verify it "
+                   "and activate your account shortly.")
+        else:
+            msg = "Please fill in both your email and the transaction ID."
+    return render_template(
+        "payment.html", msg=msg,
+        amount=get_setting("payment_amount"),
+        email=request.args.get("email", ""))
 
 
 @app.route("/logout")
@@ -495,6 +524,8 @@ def build_pdf(out, payload):
 @admin_required
 def admin():
     df = load_data()
+    payments = db().execute(
+        "SELECT * FROM payments ORDER BY id DESC LIMIT 50").fetchall()
     users = db().execute(
         "SELECT id,name,email,role,disabled,approved,created_at FROM users "
         "ORDER BY approved ASC, id ASC").fetchall()
@@ -515,10 +546,12 @@ def admin():
                 "zone_safe": get_setting("zone_safe"),
                 "zone_ambitious": get_setting("zone_ambitious"),
                 "registration_open": get_setting("registration_open"),
-                "data_year": get_setting("data_year")}
+                "data_year": get_setting("data_year"),
+                "payment_amount": get_setting("payment_amount")}
     return render_template("admin.html", users=users, data_info=data_info,
                            settings=settings, total_predictions=logs,
-                           top_branches=top_branches, pending=pending)
+                           top_branches=top_branches, pending=pending,
+                           payments=payments)
 
 
 @app.route("/admin/upload", methods=["POST"])
@@ -560,6 +593,8 @@ def admin_settings():
     set_setting("registration_open",
                 1 if request.form.get("registration_open") else 0)
     set_setting("data_year", request.form.get("data_year", "2025 (Latest)"))
+    set_setting("payment_amount",
+                request.form.get("payment_amount", "99").strip())
     return redirect(url_for("admin"))
 
 

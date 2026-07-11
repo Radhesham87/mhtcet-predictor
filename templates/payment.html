@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Payment · MHT-CET Predictor 2026{% endblock %}
+{% block content %}
+<div class="page" style="max-width:900px">
+  <h1 class="page-title">Activate Your Account</h1>
+  <p class="page-sub">Pay the one-time access fee, submit your transaction ID,
+     and the admin will activate your account.</p>
+
+  {% if msg %}<div class="alert">{{ msg }}</div>{% endif %}
+
+  <div class="pay-grid">
+    <div class="adv-card" style="text-align:center">
+      <div class="adv-head" style="justify-content:center">📱 Scan &amp; Pay — ₹{{ amount }}</div>
+      <img src="{{ url_for('static', filename='payment_qr.png') }}"
+           alt="UPI QR code" class="pay-qr">
+      <p class="hint">Scan with any UPI app (GPay, PhonePe, Paytm, BHIM)</p>
+    </div>
+
+    <div>
+      <div class="adv-card">
+        <div class="adv-head">🏦 Payment Details</div>
+        <table class="pay-table">
+          <tr><td>Amount</td><td><b>₹{{ amount }}</b></td></tr>
+          <tr><td>UPI ID</td><td><b>9579421803@kotakbank</b></td></tr>
+          <tr><td>Account Holder</td><td>RADHESHAM RAMESHRAO TAYNATH</td></tr>
+          <tr><td>Account No</td><td>6251911843</td></tr>
+          <tr><td>IFSC Code</td><td>KKBK0000843</td></tr>
+          <tr><td>Bank</td><td>Kotak Mahindra Bank (Kotak811)</td></tr>
+        </table>
+      </div>
+
+      <div class="adv-card">
+        <div class="adv-head">✅ After Paying</div>
+        <form method="post" class="auth-form">
+          <label>Your registered email</label>
+          <input type="email" name="email" required value="{{ email }}"
+                 placeholder="you@example.com">
+          <label>UPI Transaction ID / UTR number</label>
+          <input type="text" name="txn_ref" required
+                 placeholder="e.g. 415223987654">
+          <button class="btn-primary" type="submit">Submit Payment Reference</button>
+        </form>
+        <p class="hint" style="margin-top:10px">Find the transaction ID in your
+           UPI app's payment history. Once the admin verifies it, your account
+           is activated and you can sign in.</p>
+      </div>
+    </div>
+  </div>
+  <a href="{{ url_for('login') }}" class="hint">← Back to Sign In</a>
+</div>
+{% endblock %}

@@ -228,3 +228,11 @@ td.quota { min-width: 160px; font-size: 12px; color: var(--muted); }
 .d-table .quota { max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: #a3abc2; }
 @media (max-width: 900px) { .dark-app { grid-template-columns: 1fr; }
   .metric-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---------- payment page ---------- */
+.pay-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 22px; margin-bottom: 14px; }
+.pay-qr { width: 100%; max-width: 300px; border-radius: 14px; border: 1px solid var(--line); }
+.pay-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.pay-table td { padding: 9px 6px; border-bottom: 1px solid var(--line); }
+.pay-table td:first-child { color: var(--muted); width: 150px; }
+@media (max-width: 800px) { .pay-grid { grid-template-columns: 1fr; } }
